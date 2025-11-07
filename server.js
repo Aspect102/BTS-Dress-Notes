@@ -21,6 +21,10 @@ app.get('/recall.html', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'recall.html'));
 });
 
+app.get('/overlay.html', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'overlay.html'));
+});
+
 // Load tags from JSON file
 let tags = [];
 try {
