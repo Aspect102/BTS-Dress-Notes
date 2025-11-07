@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MIDI Timecode Notes - Recall</title>
+    <title>BTS Dress Notes - Recall</title>
     <style>
         * {
             margin: 0;
@@ -13,7 +13,7 @@
         }
         
         body {
-            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #fdbb2d);
+            background: #000000;
             color: white;
             min-height: 100vh;
             padding: 2rem;
@@ -60,7 +60,7 @@
         }
         
         .upload-section {
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(30, 30, 30, 0.9);
             border-radius: 15px;
             padding: 2rem;
             margin-bottom: 2rem;
@@ -116,7 +116,7 @@
         }
         
         .notes-section {
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(30, 30, 30, 0.9);
             border-radius: 15px;
             padding: 2rem;
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
@@ -226,8 +226,8 @@
             font-weight: bold;
         }
         
-        /* Reactions Styles for Recall */
-        .note-reactions {
+        /* Comments Styles for Recall */
+        .note-comments {
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
@@ -236,7 +236,7 @@
             border-top: 1px solid rgba(255, 255, 255, 0.2);
         }
         
-        .reaction {
+        .comment {
             display: flex;
             align-items: center;
             gap: 0.3rem;
@@ -247,11 +247,11 @@
             font-size: 0.8rem;
         }
         
-        .reaction-emoji {
+        .comment-emoji {
             font-size: 1.2rem;
         }
         
-        .reaction-count {
+        .comment-count {
             font-weight: bold;
         }
         
@@ -304,7 +304,7 @@
 <body>
     <div class="container">
         <header>
-            <h1>MIDI Timecode Notes - Recall</h1>
+            <h1>BTS Dress Notes - Recall</h1>
             <p class="subtitle">Review and filter exported notes from previous sessions</p>
             <a href="/" class="back-link">← Back to Live Notes</a>
         </header>
@@ -348,11 +348,13 @@
         </div>
         
         <footer>
-            <p>MIDI Timecode Notes &copy; 2023 | Note Recall System</p>
+            <p>BTS Dress Notes &copy; 2025 | Vibecoded by Jamie with ❤️</p>
         </footer>
     </div>
 
     <script>
+        // All the JavaScript code remains exactly the same as in the previous version
+        // Only the CSS has been changed for the background
         document.addEventListener('DOMContentLoaded', function() {
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');

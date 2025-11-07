@@ -31,10 +31,14 @@ try {
 } catch (error) {
     console.log('Error loading tags.json, using default tags:', error.message);
     tags = [
-        { id: 'lighting', name: 'Lighting', color: '#FF6B6B' },
-        { id: 'sound', name: 'Sound', color: '#4ECDC4' },
-        { id: 'stage', name: 'Stage', color: '#45B7D1' },
-        { id: 'general', name: 'General', color: '#F7DC6F' }
+        { id: 'safety', name: 'Safety', color: '#E63946' },
+        { id: 'technical', name: 'Technical', color: '#F4A261' },
+        { id: 'artistic', name: 'Artistic', color: '#9B5DE5' },
+        { id: 'lighting', name: 'Lighting', color: '#00B4D8' },
+        { id: 'sound', name: 'Sound', color: '#06D6A0' },
+        { id: 'stage', name: 'Stage', color: '#118AB2' },
+        { id: 'dsm', name: 'DSM', color: '#8AC926' },
+        { id: 'set', name: 'Set', color: '#FF6f91' }
     ];
 }
 
@@ -376,6 +380,75 @@ io.on('connection', (socket) => {
             }
             
             note.comments.push(comment);
+            io.emit('notes-update', globalState.notes);
+        }
+    });
+        // Global chat messages array in globalState
+    globalState.chatMessages = [];
+
+    // Handle chat message submission
+    socket.on('chat-message', (data) => {
+        const chatMessage = {
+            id: Date.now() + Math.random().toString(36).substr(2, 9),
+            user: user.name,
+            userId: user.id,
+            text: data.text,
+            timestamp: new Date().toISOString()
+        };
+        
+        globalState.chatMessages.push(chatMessage);
+        
+        // Keep only last 100 messages to prevent memory issues
+        if (globalState.chatMessages.length > 100) {
+            globalState.chatMessages = globalState.chatMessages.slice(-100);
+        }
+        
+        io.emit('chat-message-added', chatMessage);
+        io.emit('chat-messages-update', globalState.chatMessages);
+    });
+
+    // Send chat history to newly connected clients
+    socket.emit('chat-messages-update', globalState.chatMessages);
+    // Handle note text editing
+    socket.on('note-edit-text', (data) => {
+        const { noteId, newText } = data;
+        const note = globalState.notes.find(n => n.id === noteId);
+        
+        if (note) {
+            note.text = newText;
+            // Update the timestamp to show when it was last edited
+            note.lastEdited = new Date().toISOString();
+            note.lastEditedBy = user.name;
+            
+            io.emit('notes-update', globalState.notes);
+        }
+    });
+
+    // Handle comment editing
+    socket.on('comment-edit', (data) => {
+        const { noteId, commentId, newText } = data;
+        const note = globalState.notes.find(n => n.id === noteId);
+        
+        if (note && note.comments) {
+            const comment = note.comments.find(c => c.id === commentId);
+            if (comment) {
+                comment.text = newText;
+                // Update the timestamp to show when it was last edited
+                comment.lastEdited = new Date().toISOString();
+                comment.lastEditedBy = user.name;
+                
+                io.emit('notes-update', globalState.notes);
+            }
+        }
+    });
+
+    // Handle comment deletion
+    socket.on('comment-delete', (data) => {
+        const { noteId, commentId } = data;
+        const note = globalState.notes.find(n => n.id === noteId);
+        
+        if (note && note.comments) {
+            note.comments = note.comments.filter(c => c.id !== commentId);
             io.emit('notes-update', globalState.notes);
         }
     });
