@@ -243,20 +243,25 @@ io.on('connection', (socket) => {
     // For IPv6 format (::ffff:192.168.1.1), extract the IPv4 part
     const userIP = clientIP.replace(/^.*:/, '');
     
+    // Check if this is an overlay connection (from overlay.html)
+    const isOverlay = socket.handshake.headers.referer && 
+                     socket.handshake.headers.referer.includes('overlay.html');
+    
     const user = {
         id: socket.id,
-        name: userIP, // Set default name to IP address
+        name: isOverlay ? `Overlay-${userIP}` : userIP, // Set default name to IP address
         isTyping: false,
         currentTimecode: null,
         currentLxCue: null,
-        joinedAt: new Date()
+        joinedAt: new Date(),
+        isOverlay: isOverlay // Flag to identify overlay users
     };
+    
     globalState.users.set(socket.id, user);
 
     // Send current state to newly connected client
     socket.emit('timecode-update', globalState.timecode);
     socket.emit('notes-update', globalState.notes);
-    socket.emit('users-update', Array.from(globalState.users.values()));
     socket.emit('tags-update', globalState.tags);
     socket.emit('time-mode-update', globalState.timeMode);
     socket.emit('lx-cue-update', globalState.currentLxCue);
@@ -268,14 +273,23 @@ io.on('connection', (socket) => {
         oscAvailable: !!oscServer
     });
 
-    // Send the user their initial name (IP address)
-    socket.emit('user-initial-name', userIP);
-
-    // Notify about new user joining
-    io.emit('user-joined', {
-        user: user.name,
-        userCount: globalState.users.size
-    });
+    // Only send user-related updates if this is NOT an overlay
+    if (!isOverlay) {
+        socket.emit('user-initial-name', userIP);
+        
+        // Send filtered users list (excluding overlay users)
+        const filteredUsers = Array.from(globalState.users.values()).filter(u => !u.isOverlay);
+        socket.emit('users-update', filteredUsers);
+        
+        // Notify about new user joining (only for non-overlay users)
+        io.emit('user-joined', {
+            user: user.name,
+            userCount: filteredUsers.length
+        });
+    } else {
+        // Overlay users get minimal user info
+        socket.emit('users-update', []);
+    }
 
     // Handle note tag updates
     socket.on('note-update-tags', (data) => {
@@ -314,24 +328,36 @@ io.on('connection', (socket) => {
         io.emit('tags-update', globalState.tags);
     });
     
-    // Handle user starting to type
+    // Handle user starting to type (only for non-overlay users)
     socket.on('typing-start', (data) => {
+        if (user.isOverlay) return; // Overlay users can't type
+        
         user.isTyping = true;
         user.currentTimecode = data.timecode || {...globalState.timecode};
         user.currentLxCue = data.lxCue || globalState.currentLxCue;
-        io.emit('users-update', Array.from(globalState.users.values()));
+        
+        // Send filtered users list (excluding overlay users)
+        const filteredUsers = Array.from(globalState.users.values()).filter(u => !u.isOverlay);
+        io.emit('users-update', filteredUsers);
     });
     
-    // Handle user stopping typing
+    // Handle user stopping typing (only for non-overlay users)
     socket.on('typing-stop', () => {
+        if (user.isOverlay) return; // Overlay users can't type
+        
         user.isTyping = false;
         user.currentTimecode = null;
         user.currentLxCue = null;
-        io.emit('users-update', Array.from(globalState.users.values()));
+        
+        // Send filtered users list (excluding overlay users)
+        const filteredUsers = Array.from(globalState.users.values()).filter(u => !u.isOverlay);
+        io.emit('users-update', filteredUsers);
     });
     
-    // Handle time mode change
+    // Handle time mode change (only for non-overlay users)
     socket.on('time-mode-change', (newMode) => {
+        if (user.isOverlay) return; // Overlay users can't change time mode
+        
         if (newMode === 'midi' || newMode === 'realtime') {
             globalState.timeMode = newMode;
             io.emit('time-mode-update', globalState.timeMode);
@@ -340,6 +366,8 @@ io.on('connection', (socket) => {
 
     // Handle LX Cue change (manual input - will be overridden by OSC)
     socket.on('lx-cue-change', (newCue) => {
+        if (user.isOverlay) return; // Overlay users can't change LX cues
+        
         // Only update if OSC is not available, or allow manual override
         if (!oscServer) {
             globalState.currentLxCue = newCue;
@@ -351,8 +379,10 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Handle note submission
+    // Handle note submission (only for non-overlay users)
     socket.on('note-submit', (data) => {
+        if (user.isOverlay) return; // Overlay users can't submit notes
+        
         const noteTimecode = data.timecode || {...globalState.timecode};
         
         const note = {
@@ -374,8 +404,10 @@ io.on('connection', (socket) => {
         io.emit('notes-update', globalState.notes);
     });
 
-    // Handle comment submission
+    // Handle comment submission (only for non-overlay users)
     socket.on('comment-submit', (data) => {
+        if (user.isOverlay) return; // Overlay users can't comment
+        
         const { noteId, text } = data;
         const note = globalState.notes.find(n => n.id === noteId);
         
@@ -396,11 +428,11 @@ io.on('connection', (socket) => {
             io.emit('notes-update', globalState.notes);
         }
     });
-        // Global chat messages array in globalState
-    globalState.chatMessages = [];
 
-    // Handle chat message submission
+    // Handle chat message submission (only for non-overlay users)
     socket.on('chat-message', (data) => {
+        if (user.isOverlay) return; // Overlay users can't chat
+        
         const chatMessage = {
             id: Date.now() + Math.random().toString(36).substr(2, 9),
             user: user.name,
@@ -420,10 +452,15 @@ io.on('connection', (socket) => {
         io.emit('chat-messages-update', globalState.chatMessages);
     });
 
-    // Send chat history to newly connected clients
-    socket.emit('chat-messages-update', globalState.chatMessages);
-    // Handle note text editing
+    // Send chat history to newly connected clients (only for non-overlay)
+    if (!isOverlay) {
+        socket.emit('chat-messages-update', globalState.chatMessages);
+    }
+
+    // Handle note text editing (only for non-overlay users)
     socket.on('note-edit-text', (data) => {
+        if (user.isOverlay) return; // Overlay users can't edit notes
+        
         const { noteId, newText } = data;
         const note = globalState.notes.find(n => n.id === noteId);
         
@@ -437,8 +474,10 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle comment editing
+    // Handle comment editing (only for non-overlay users)
     socket.on('comment-edit', (data) => {
+        if (user.isOverlay) return; // Overlay users can't edit comments
+        
         const { noteId, commentId, newText } = data;
         const note = globalState.notes.find(n => n.id === noteId);
         
@@ -455,8 +494,10 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Handle comment deletion
+    // Handle comment deletion (only for non-overlay users)
     socket.on('comment-delete', (data) => {
+        if (user.isOverlay) return; // Overlay users can't delete comments
+        
         const { noteId, commentId } = data;
         const note = globalState.notes.find(n => n.id === noteId);
         
@@ -466,11 +507,13 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Handle user name changes with uniqueness check
+    // Handle user name changes with uniqueness check (only for non-overlay users)
     socket.on('user-name-change', (newName) => {
+        if (user.isOverlay) return; // Overlay users can't change names
+        
         // Check if name is already taken by another user
         const isNameTaken = Array.from(globalState.users.values()).some(
-            u => u.id !== user.id && u.name.toLowerCase() === newName.toLowerCase()
+            u => u.id !== user.id && u.name.toLowerCase() === newName.toLowerCase() && !u.isOverlay
         );
         
         if (isNameTaken) {
@@ -496,7 +539,9 @@ io.on('connection', (socket) => {
                 }
             });
             
-            io.emit('users-update', Array.from(globalState.users.values()));
+            // Send filtered users list (excluding overlay users)
+            const filteredUsers = Array.from(globalState.users.values()).filter(u => !u.isOverlay);
+            io.emit('users-update', filteredUsers);
             io.emit('notes-update', globalState.notes);
             
             socket.emit('name-change-success', {
@@ -505,8 +550,10 @@ io.on('connection', (socket) => {
         }
     });
     
-    // Handle export requests
+    // Handle export requests (only for non-overlay users)
     socket.on('export-request', (format) => {
+        if (user.isOverlay) return; // Overlay users can't export
+        
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
         let data, mimeType, filename;
         
@@ -515,7 +562,7 @@ io.on('connection', (socket) => {
                 notes: globalState.notes,
                 exportedAt: new Date().toISOString(),
                 totalNotes: globalState.notes.length,
-                users: Array.from(globalState.users.values()).map(u => ({
+                users: Array.from(globalState.users.values()).filter(u => !u.isOverlay).map(u => ({
                     name: u.name,
                     joinedAt: u.joinedAt
                 })),
@@ -554,13 +601,18 @@ io.on('connection', (socket) => {
         console.log('Client disconnected:', socket.id);
         const user = globalState.users.get(socket.id);
         if (user) {
-            io.emit('user-left', {
-                user: user.name,
-                userCount: globalState.users.size - 1
-            });
+            globalState.users.delete(socket.id);
+            
+            // Only notify if this was NOT an overlay user
+            if (!user.isOverlay) {
+                const filteredUsers = Array.from(globalState.users.values()).filter(u => !u.isOverlay);
+                io.emit('user-left', {
+                    user: user.name,
+                    userCount: filteredUsers.length
+                });
+                io.emit('users-update', filteredUsers);
+            }
         }
-        globalState.users.delete(socket.id);
-        io.emit('users-update', Array.from(globalState.users.values()));
     });
 });
 
