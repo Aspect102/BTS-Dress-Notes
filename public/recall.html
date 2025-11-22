@@ -369,10 +369,10 @@
             const fileType = document.getElementById('fileType');
             const fileNotesCount = document.getElementById('fileNotesCount');
             const filterTagsContainer = document.getElementById('filterTags');
+            const filterActContainer = document.getElementById('recallActFilter');
             const notesList = document.getElementById('notesList');
             const totalNotes = document.getElementById('totalNotes');
             const filteredNotes = document.getElementById('filteredNotes');
-            const recallActFilter = document.getElementById('recallActFilter');
             
             let allNotes = [];
             let availableTags = [];
@@ -459,6 +459,7 @@
                     extractTags();
                     updateNotesList();
                     updateFilterTags();
+                    updateFilterActs();
                     updateStats();
                 } else {
                     alert('Invalid JSON format: Expected "notes" array');
@@ -541,6 +542,7 @@
                 extractTags();
                 updateNotesList();
                 updateFilterTags();
+                updateFilterActs();
                 updateStats();
             }
             
@@ -635,10 +637,26 @@
                         
                         updateNotesList();
                         updateStats();
+                        updateFilterActs();
                     });
                 });
             }
-            
+
+            function updateFilterActs() {
+                // Get unique acts from imported notes
+                const uniqueActs = [...new Set(allNotes.map(note => note.act))];
+                
+                const actFilterContainer = document.getElementById('recallActFilter');
+                actFilterContainer.innerHTML = '<div class="filter-tag active" data-act="all">All Acts</div>';
+                
+                uniqueActs.forEach(act => {
+                    const actElement = `
+                        <div class="filter-tag" data-act="${act}">${act}</div>
+                    `;
+                    actFilterContainer.innerHTML += actElement;
+                });
+            }
+
             function updateNotesList() {
                 if (allNotes.length === 0) {
                     notesList.innerHTML = '<div style="text-align: center; opacity: 0.7; padding: 2rem;">No notes to display</div>';
@@ -653,6 +671,11 @@
                     );
                 }
                 
+                if (filterAct !== 'all') {
+                    filteredNotes = filteredNotes.filter(note => 
+                        note.act === filterAct
+                    );
+                }
                 // Sort by timestamp
                 const chronologicalNotes = [...filteredNotes].sort((a, b) => {
                     if (a.timestamp && b.timestamp) {
