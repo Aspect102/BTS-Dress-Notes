@@ -578,8 +578,7 @@ io.on('connection', (socket) => {
                     name: u.name,
                     joinedAt: u.joinedAt
                 })),
-                tags: globalState.tags,
-                acts: availableActs // Include available acts in export
+                tags: globalState.tags
             };
             data = JSON.stringify(exportData, null, 2);
             mimeType = 'application/json';
