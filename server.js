@@ -39,9 +39,7 @@ try {
 } catch (error) {
     console.log('Error loading tags.json, using default tags:', error.message);
     tags = [
-        { id: 'safety', name: 'Safety', color: '#E63946' },
-        { id: 'technical', name: 'Technical', color: '#F4A261' },
-        { id: 'artistic', name: 'Artistic', color: '#9B5DE5' },
+        { id: 'safety', name: 'Safety/Show Critical', color: '#E63946' },
         { id: 'lighting', name: 'Lighting', color: '#00B4D8' },
         { id: 'sound', name: 'Sound', color: '#06D6A0' },
         { id: 'stage', name: 'Stage', color: '#118AB2' },

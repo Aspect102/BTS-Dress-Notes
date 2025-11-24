@@ -695,30 +695,38 @@
                         return `<span class="note-tag" style="background-color: #cccccc; color: #000;">${tagId}</span>`;
                     }).join('');
                     
-                    // Reaction configuration for display
-                    const reactionElements = (note.reactions || []).map(reaction => {
+                    const commentElements = (note.comments || []).map(comment => {
+                        const commentTime = new Date(comment.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                         return `
-                            <div class="reaction">
-                                <span class="reaction-emoji">${reaction.emoji}</span>
-                                <span class="reaction-count">${reaction.users.length}</span>
+                            <div class="comment" style="background: rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 5px; margin-top: 0.3rem; border-left: 2px solid rgba(76, 175, 80, 0.5);">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.2rem;">
+                                    <span style="font-weight: bold; color: #4CAF50;">${comment.user}</span>
+                                    <span>${commentTime}</span>
+                                </div>
+                                <div style="font-size: 0.9rem;">${comment.text}</div>
                             </div>
                         `;
                     }).join('');
                     
                     return `
-                        <div class="note-item" data-tags="${(note.tags || []).join(',')}" data-act="${note.act || 'Preshow'}">
+                        <div class="note-item" data-tags="${(note.tags || []).join(',')}" data-act="${note.act || 'Act 1'}">
                             <div class="note-header">
-                                <span class="note-act">${note.act || 'Preshow'}</span>
                                 <span class="note-user">${note.user}</span>
                                 <span class="note-timecode">
                                     ${timecodeDisplay} 
                                     <span class="note-lx-cue">LX: ${note.lxCue || 'N/A'}</span>
                                     @ ${note.frameRate || '30 fps'}
                                 </span>
+                                <span class="note-act">${note.act || 'Act 1'}</span>
                             </div>
                             <div class="note-text">${note.text}</div>
                             ${(note.tags || []).length > 0 ? `<div class="note-tags">${tagElements}</div>` : ''}
-                            ${(note.reactions || []).length > 0 ? `<div class="note-reactions">${reactionElements}</div>` : ''}
+                            ${(note.comments || []).length > 0 ? `
+                                <div class="comments-section" style="margin-top: 1rem;">
+                                    <div style="font-size: 0.9rem; opacity: 0.8; margin-bottom: 0.5rem;">Comments:</div>
+                                    ${commentElements}
+                                </div>
+                            ` : ''}
                         </div>
                     `;
                 }).join('');

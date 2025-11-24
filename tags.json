@@ -2,18 +2,8 @@
   "tags": [
     {
       "id": "safety",
-      "name": "Safety",
+      "name": "Safety/Show Critical",
       "color": "#E63946"
-    },
-    {
-      "id": "technical",
-      "name": "Technical",
-      "color": "#F4A261"
-    },
-    {
-      "id": "artistic",
-      "name": "Artistic",
-      "color": "#9B5DE5"
     },
     {
       "id": "lighting",
