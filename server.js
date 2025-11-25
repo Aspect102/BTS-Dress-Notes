@@ -242,6 +242,75 @@ if (midiInput) {
     });
 }
 
+function backup() {
+    let data;
+    const exportData = {
+        notes: globalState.notes,
+        exportedAt: new Date().toISOString(),
+        totalNotes: globalState.notes.length,
+        users: Array.from(globalState.users.values()).filter(u => !u.isOverlay).map(u => ({
+            name: u.name,
+            joinedAt: u.joinedAt
+        })),
+        tags: globalState.tags
+    };
+    data = JSON.stringify(exportData, null, 2);
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `backup-${timestamp}.json`;
+    try {
+        fs.mkdirSync(path.join(__dirname, 'backups'), { recursive: true });
+        fs.writeFileSync(path.join(__dirname, 'backups', filename), data);
+        console.log(`Backup saved to backups/${filename}`);
+    } catch (error) {
+        console.log('Error saving backup file:', error.message);
+    }
+}
+
+// Schedule backups every minute
+setInterval(backup, 1 * 60 * 1000);
+
+// Delete backups older than 1 day
+setInterval(() => {
+    const backupDir = path.join(__dirname, 'backups');
+    fs.readdir(backupDir, (err, files) => {
+        if (err) return;
+        const now = Date.now();
+        files.forEach(file => {
+            const filePath = path.join(backupDir, file);
+            fs.stat(filePath, (err, stats) => {
+                if (err) return;
+                const age = now - stats.mtimeMs;
+                if (age > 24 * 60 * 60 * 1000) {
+                    fs.unlink(filePath, (error) => {
+                        if (error) return;
+                        console.log(`Deleted old backup file: ${file}`);
+                    });
+                }
+            });
+        });
+    });
+}, 24 * 60 * 60 * 1000);
+
+// Backups on errors and graceful shutdown
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught Exception:', err);
+    backup();
+    process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+    backup();
+    process.exit(1);
+});
+
+process.on('SIGINT', () => {
+    console.log('Received SIGINT. Backing up and shutting down...');
+    backup();
+    process.exit(0);
+});
+
+
 // WebSocket connections
 io.on('connection', (socket) => {
     console.log('Client connected:', socket.id);
