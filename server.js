@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// HTML sanitization function to prevent XSS attacks
+// HTML sanitization function to prevent XSS attacks (full escape)
 function escapeHtml(text) {
     if (typeof text !== 'string') return text;
     return text
@@ -17,6 +17,84 @@ function escapeHtml(text) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+// Sanitize name - allow only color spans
+function sanitizeName(text) {
+    if (typeof text !== 'string') return text;
+    // Allow <span style="color: #hex or colorname">text</span> pattern only
+    // First, extract and validate color spans, then escape everything else
+    const colorSpanRegex = /<span\s+style="color:\s*(#[0-9a-fA-F]{3,6}|[a-zA-Z]+)">([^<]*)<\/span>/gi;
+    const validSpans = [];
+    let match;
+    
+    // Find all valid color spans and store them
+    while ((match = colorSpanRegex.exec(text)) !== null) {
+        validSpans.push({
+            original: match[0],
+            color: match[1],
+            content: match[2],
+            placeholder: `__COLOR_SPAN_${validSpans.length}__`
+        });
+    }
+    
+    // Replace valid spans with placeholders
+    let result = text;
+    validSpans.forEach(span => {
+        result = result.replace(span.original, span.placeholder);
+    });
+    
+    // Escape remaining HTML
+    result = escapeHtml(result);
+    
+    // Restore valid color spans
+    validSpans.forEach(span => {
+        result = result.replace(span.placeholder, `<span style="color: ${span.color}">${escapeHtml(span.content)}</span>`);
+    });
+    
+    return result;
+}
+
+// Sanitize shitpost - allow only img tags with safe src
+function sanitizeShitpost(text) {
+    if (typeof text !== 'string') return text;
+    // Allow <img src="url" alt="..." width="..." height="..."> pattern only
+    const imgRegex = /<img\s+src="(https?:\/\/[^"]+|data:image\/[^"]+)"(\s+alt="([^"]*)")?(\s+width="(\d+)")?(\s+height="(\d+)")?\s*\/?>/gi;
+    const validImgs = [];
+    let match;
+    
+    // Find all valid img tags and store them
+    while ((match = imgRegex.exec(text)) !== null) {
+        validImgs.push({
+            original: match[0],
+            src: match[1],
+            alt: match[3] || '',
+            width: match[5] || '',
+            height: match[7] || '',
+            placeholder: `__IMG_TAG_${validImgs.length}__`
+        });
+    }
+    
+    // Replace valid imgs with placeholders
+    let result = text;
+    validImgs.forEach(img => {
+        result = result.replace(img.original, img.placeholder);
+    });
+    
+    // Escape remaining HTML
+    result = escapeHtml(result);
+    
+    // Restore valid img tags
+    validImgs.forEach(img => {
+        let imgTag = `<img src="${img.src}"`;
+        if (img.alt) imgTag += ` alt="${escapeHtml(img.alt)}"`;
+        if (img.width) imgTag += ` width="${img.width}"`;
+        if (img.height) imgTag += ` height="${img.height}"`;
+        imgTag += ' style="max-width: 100%; max-height: 200px;">';
+        result = result.replace(img.placeholder, imgTag);
+    });
+    
+    return result;
 }
 
 // Sanitize user input object
@@ -563,7 +641,7 @@ io.on('connection', (socket) => {
             id: Date.now() + Math.random().toString(36).substr(2, 9),
             user: user.name,
             userId: user.id,
-            text: escapeHtml(data.text),
+            text: sanitizeShitpost(data.text),
             timestamp: new Date().toISOString()
         };
         
@@ -637,17 +715,18 @@ io.on('connection', (socket) => {
     socket.on('user-name-change', (newName) => {
         if (user.isOverlay) return;
         
-        // Sanitize the new name
-        const sanitizedName = escapeHtml(newName);
+        // Sanitize the new name (allows color spans)
+        const sanitizedName = sanitizeName(newName);
         
-        // Check if name is already taken by another user
+        // Check if name is already taken by another user (compare plain text)
+        const plainName = newName.replace(/<[^>]*>/g, '').toLowerCase();
         const isNameTaken = Array.from(globalState.users.values()).some(
-            u => u.id !== user.id && u.name.toLowerCase() === sanitizedName.toLowerCase() && !u.isOverlay
+            u => u.id !== user.id && u.name.replace(/<[^>]*>/g, '').toLowerCase() === plainName && !u.isOverlay
         );
         
         if (isNameTaken) {
             socket.emit('name-change-error', {
-                message: `Name "${sanitizedName}" is already taken. Please choose a different name.`
+                message: `Name "${escapeHtml(newName)}" is already taken. Please choose a different name.`
             });
         } else {
             const oldName = user.name;

@@ -369,6 +369,23 @@
                 div.textContent = text;
                 return div.innerHTML;
             }
+            
+            // Allow only color styling in names via <span style="color:...">
+            function sanitizeName(text) {
+                if (typeof text !== 'string') return text;
+                // First escape everything
+                let escaped = escapeHtml(text);
+                // Then restore valid color spans
+                // Match: &lt;span style=&quot;color: #abc123&quot;&gt;text&lt;/span&gt;
+                escaped = escaped.replace(/&lt;span\s+style=(?:&quot;|&#039;)color:\s*([#a-zA-Z0-9]+)(?:&quot;|&#039;)&gt;([^&]*?)&lt;\/span&gt;/gi,
+                    function(match, color, content) {
+                        // Validate color is a valid hex color or named color
+                        if (!/^(#[0-9a-fA-F]{3,6}|[a-zA-Z]+)$/.test(color)) return escapeHtml(content);
+                        return `<span style="color: ${color}">${escapeHtml(content)}</span>`;
+                    }
+                );
+                return escaped;
+            }
             const uploadArea = document.getElementById('uploadArea');
             const fileInput = document.getElementById('fileInput');
             const fileInfo = document.getElementById('fileInfo');
@@ -707,7 +724,7 @@
                         return `
                             <div class="comment" style="background: rgba(255,255,255,0.1); padding: 0.5rem; border-radius: 5px; margin-top: 0.3rem; border-left: 2px solid rgba(76, 175, 80, 0.5);">
                                 <div style="display: flex; justify-content: space-between; font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.2rem;">
-                                    <span style="font-weight: bold; color: #4CAF50;">${escapeHtml(comment.user)}</span>
+                                    <span style="font-weight: bold; color: #4CAF50;">${sanitizeName(comment.user)}</span>
                                     <span>${commentTime}</span>
                                 </div>
                                 <div style="font-size: 0.9rem;">${escapeHtml(comment.text)}</div>
@@ -718,7 +735,7 @@
                     return `
                         <div class="note-item" data-tags="${escapeHtml((note.tags || []).join(','))}" data-act="${escapeHtml(note.act) || 'Act 1'}">
                             <div class="note-header">
-                                <span class="note-user">${escapeHtml(note.user)}</span>
+                                <span class="note-user">${sanitizeName(note.user)}</span>
                                 <span class="note-timecode">
                                     ${timecodeDisplay} 
                                     <span class="note-lx-cue">LX: ${escapeHtml(note.lxCue) || 'N/A'}</span>
