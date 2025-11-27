@@ -22,32 +22,34 @@ function escapeHtml(text) {
 // Sanitize name - allow only color spans
 function sanitizeName(text) {
     if (typeof text !== 'string') return text;
+    
     // Allow <span style="color: #hex or colorname">text</span> pattern only
-    // First, extract and validate color spans, then escape everything else
     const colorSpanRegex = /<span\s+style="color:\s*(#[0-9a-fA-F]{3,6}|[a-zA-Z]+)">([^<]*)<\/span>/gi;
     const validSpans = [];
     let match;
+    let tempText = text;
     
-    // Find all valid color spans and store them
+    // Find all valid color spans and store them with unique placeholders
     while ((match = colorSpanRegex.exec(text)) !== null) {
+        const placeholder = `\x00COLORSPAN${validSpans.length}\x00`;
         validSpans.push({
             original: match[0],
             color: match[1],
             content: match[2],
-            placeholder: `__COLOR_SPAN_${validSpans.length}__`
+            placeholder: placeholder
         });
     }
     
-    // Replace valid spans with placeholders
+    // Replace valid spans with placeholders (use a character that won't appear in normal text)
     let result = text;
     validSpans.forEach(span => {
         result = result.replace(span.original, span.placeholder);
     });
     
-    // Escape remaining HTML
+    // Escape ALL remaining HTML
     result = escapeHtml(result);
     
-    // Restore valid color spans
+    // Restore valid color spans (placeholders won't be affected by escapeHtml)
     validSpans.forEach(span => {
         result = result.replace(span.placeholder, `<span style="color: ${span.color}">${escapeHtml(span.content)}</span>`);
     });
@@ -71,7 +73,7 @@ function sanitizeShitpost(text) {
             alt: match[3] || '',
             width: match[5] || '',
             height: match[7] || '',
-            placeholder: `__IMG_TAG_${validImgs.length}__`
+            placeholder: `\x00IMGTAG${validImgs.length}\x00`
         });
     }
     
@@ -95,6 +97,16 @@ function sanitizeShitpost(text) {
     });
     
     return result;
+}
+
+// Sanitize note text - no HTML allowed, show message if attempted
+function sanitizeNote(text) {
+    if (typeof text !== 'string') return text;
+    // Check if text contains any HTML tags
+    if (/<[^>]+>/.test(text)) {
+        return 'Nice Try Zac...';
+    }
+    return escapeHtml(text);
 }
 
 // Sanitize user input object
@@ -592,7 +604,7 @@ io.on('connection', (socket) => {
             id: Date.now() + Math.random().toString(36).substr(2, 9),
             user: user.name,
             userId: user.id,
-            text: escapeHtml(data.text),
+            text: sanitizeNote(data.text),
             timecode: noteTimecode,
             lxCue: escapeHtml(data.lxCue) || globalState.currentLxCue,
             timestamp: new Date().toISOString(),
@@ -620,7 +632,7 @@ io.on('connection', (socket) => {
                 id: Date.now() + Math.random().toString(36).substr(2, 9),
                 user: user.name,
                 userId: user.id,
-                text: escapeHtml(text),
+                text: sanitizeNote(text),
                 timestamp: new Date().toISOString()
             };
             
@@ -669,7 +681,7 @@ io.on('connection', (socket) => {
         const note = globalState.notes.find(n => n.id === noteId);
         
         if (note) {
-            note.text = escapeHtml(newText);
+            note.text = sanitizeNote(newText);
             // Update the timestamp to show when it was last edited
             note.lastEdited = new Date().toISOString();
             note.lastEditedBy = user.name;
@@ -688,7 +700,7 @@ io.on('connection', (socket) => {
         if (note && note.comments) {
             const comment = note.comments.find(c => c.id === commentId);
             if (comment) {
-                comment.text = escapeHtml(newText);
+                comment.text = sanitizeNote(newText);
                 // Update the timestamp to show when it was last edited
                 comment.lastEdited = new Date().toISOString();
                 comment.lastEditedBy = user.name;
