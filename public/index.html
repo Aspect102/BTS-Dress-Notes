@@ -1278,54 +1278,6 @@
         // All the JavaScript code remains exactly the same as in the previous version
         // Only the CSS has been changed for the background
         document.addEventListener('DOMContentLoaded', function() {
-            // HTML sanitization functions to prevent XSS attacks
-            
-            // Fully escape all HTML (for notes and comments)
-            function escapeHtml(text) {
-                if (typeof text !== 'string') return text;
-                const div = document.createElement('div');
-                div.textContent = text;
-                return div.innerHTML;
-            }
-            
-            // Allow only <img> tags in shitposts
-            function sanitizeShitpost(text) {
-                if (typeof text !== 'string') return text;
-                // First escape everything
-                let escaped = escapeHtml(text);
-                // Then restore valid img tags with safe attributes only
-                // Match escaped img tags: &lt;img src="..."&gt; or &lt;img src="..." /&gt;
-                escaped = escaped.replace(/&lt;img\s+src=(?:&quot;|&#039;)([^&"'<>]+)(?:&quot;|&#039;)(\s+alt=(?:&quot;|&#039;)([^&"'<>]*)(?:&quot;|&#039;))?(\s+width=(?:&quot;|&#039;)(\d+)(?:&quot;|&#039;))?(\s+height=(?:&quot;|&#039;)(\d+)(?:&quot;|&#039;))?\s*\/?&gt;/gi, 
-                    function(match, src, altGroup, alt, widthGroup, width, heightGroup, height) {
-                        // Validate src is a valid URL (http, https, or data URI for images)
-                        if (!/^(https?:\/\/|data:image\/)/i.test(src)) return '';
-                        let img = `<img src="${src}"`;
-                        if (alt) img += ` alt="${alt}"`;
-                        if (width) img += ` width="${width}"`;
-                        if (height) img += ` height="${height}"`;
-                        img += ' style="max-width: 100%; max-height: 200px;">';
-                        return img;
-                    }
-                );
-                return escaped;
-            }
-            
-            // Allow only color styling in names via <span style="color:...">
-            function sanitizeName(text) {
-                if (typeof text !== 'string') return text;
-                // First escape everything
-                let escaped = escapeHtml(text);
-                // Then restore valid color spans
-                // Match: &lt;span style=&quot;color: #abc123&quot;&gt;text&lt;/span&gt;
-                escaped = escaped.replace(/&lt;span\s+style=(?:&quot;|&#039;)color:\s*([#a-zA-Z0-9]+)(?:&quot;|&#039;)&gt;([^&]*?)&lt;\/span&gt;/gi,
-                    function(match, color, content) {
-                        // Validate color is a valid hex color or named color
-                        if (!/^(#[0-9a-fA-F]{3,6}|[a-zA-Z]+)$/.test(color)) return escapeHtml(content);
-                        return `<span style="color: ${color}">${escapeHtml(content)}</span>`;
-                    }
-                );
-                return escaped;
-            }
             // Existing variable declarations
             const globalTimecodeElement = document.getElementById('globalTimecode');
             const globalLxCueElement = document.getElementById('globalLxCue');
@@ -1779,11 +1731,11 @@
                 tagsContainer.innerHTML = '';
                 
                 availableTags.forEach(tag => {
-                    const tagId = `tag-${escapeHtml(tag.id)}`;
+                    const tagId = `tag-${tag.id}`;
                     const tagElement = `
-                        <input type="checkbox" id="${tagId}" class="tag-checkbox" value="${escapeHtml(tag.id)}">
-                        <label for="${tagId}" class="tag-label" style="background-color: ${escapeHtml(tag.color)}; color: #000;">
-                            ${escapeHtml(tag.name)}
+                        <input type="checkbox" id="${tagId}" class="tag-checkbox" value="${tag.id}">
+                        <label for="${tagId}" class="tag-label" style="background-color: ${tag.color}; color: #000;">
+                            ${tag.name}
                         </label>
                     `;
                     tagsContainer.innerHTML += tagElement;
@@ -1808,12 +1760,12 @@
                 editTagsSelected = [...noteTags];
                 
                 availableTags.forEach(tag => {
-                    const tagId = `edit-tag-${escapeHtml(tag.id)}`;
+                    const tagId = `edit-tag-${tag.id}`;
                     const isChecked = noteTags.includes(tag.id);
                     const tagElement = `
-                        <input type="checkbox" id="${tagId}" class="tag-checkbox" value="${escapeHtml(tag.id)}" ${isChecked ? 'checked' : ''}>
-                        <label for="${tagId}" class="tag-label" style="background-color: ${escapeHtml(tag.color)}; color: #000;">
-                            ${escapeHtml(tag.name)}
+                        <input type="checkbox" id="${tagId}" class="tag-checkbox" value="${tag.id}" ${isChecked ? 'checked' : ''}>
+                        <label for="${tagId}" class="tag-label" style="background-color: ${tag.color}; color: #000;">
+                            ${tag.name}
                         </label>
                     `;
                     editTagsContainer.innerHTML += tagElement;
@@ -1838,8 +1790,8 @@
                 
                 availableTags.forEach(tag => {
                     const filterTagElement = `
-                        <div class="filter-tag" data-tag="${escapeHtml(tag.id)}" style="background-color: ${escapeHtml(tag.color)}; color: #000;">
-                            ${escapeHtml(tag.name)}
+                        <div class="filter-tag" data-tag="${tag.id}" style="background-color: ${tag.color}; color: #000;">
+                            ${tag.name}
                         </div>
                     `;
                     filterTagsContainer.innerHTML += filterTagElement;
@@ -2227,9 +2179,9 @@
                     const tagElements = note.tags.map(tagId => {
                         const tag = availableTags.find(t => t.id === tagId);
                         if (tag) {
-                            return `<span class="note-tag" style="background-color: ${escapeHtml(tag.color)}; color: #000;">${escapeHtml(tag.name)}</span>`;
+                            return `<span class="note-tag" style="background-color: ${tag.color}; color: #000;">${tag.name}</span>`;
                         }
-                        return `<span class="note-tag" style="background-color: #cccccc; color: #000;">${escapeHtml(tagId)}</span>`;
+                        return `<span class="note-tag" style="background-color: #cccccc; color: #000;">${tagId}</span>`;
                     }).join('');
                     
                     const editButton = `<button class="small edit-tags-btn" data-note-id="${note.id}">Edit Tags</button>`;
@@ -2255,7 +2207,7 @@
                             </button>
                             <div class="comments-container ${isCommentsExpanded ? 'expanded' : ''}" id="comments-${note.id}">
                                 ${note.comments ? note.comments.map(comment => `
-                                    <div class="comment-item" data-comment-id="${escapeHtml(comment.id)}">
+                                    <div class="comment-item" data-comment-id="${comment.id}">
                                         <div class="comment-header">
                                             <span class="comment-user">${comment.user}</span>
                                             <span class="comment-time">
@@ -2264,8 +2216,8 @@
                                             </span>
                                         </div>
                                         <div class="comment-text">
-                                            <span class="comment-text-display">${escapeHtml(comment.text)}</span>
-                                            <textarea class="comment-text-edit" style="display: none">${escapeHtml(comment.text)}</textarea>
+                                            <span class="comment-text-display">${comment.text}</span>
+                                            <textarea class="comment-text-edit" style="display: none">${comment.text}</textarea>
                                         </div>
                                         <div class="comment-actions" style="margin-top: 0.5rem;">
                                             <button class="small edit-comment-btn" data-note-id="${note.id}" data-comment-id="${comment.id}">Edit</button>
@@ -2287,19 +2239,19 @@
                     `;
                     
                     return `
-                        <div class="note-item" data-tags="${escapeHtml(note.tags.join(','))}" data-act="${escapeHtml(note.act) || 'Preshow'}">
+                        <div class="note-item" data-tags="${note.tags.join(',')}" data-act="${note.act || 'Preshow'}">
                             <div class="note-header">
-                                <span class="note-act">${escapeHtml(note.act) || 'Preshow'}</span>
+                                <span class="note-act">${note.act || 'Preshow'}</span>
                                 <span class="note-user">${note.user}</span>
                                 <span class="note-timecode">
                                     ${timecodeDisplay} 
-                                    <span class="note-lx-cue">LX: ${escapeHtml(note.lxCue) || 'N/A'}</span>
-                                    @ ${escapeHtml(note.frameRate) || '30 fps'}
+                                    <span class="note-lx-cue">LX: ${note.lxCue || 'N/A'}</span>
+                                    @ ${note.frameRate || '30 fps'}
                                 </span>
                             </div>
                             <div class="note-text">
-                                <span class="note-text-display">${escapeHtml(note.text)}</span>
-                                <textarea class="note-text-edit" style="display: none">${escapeHtml(note.text)}</textarea>
+                                <span class="note-text-display">${note.text}</span>
+                                <textarea class="note-text-edit" style="display: none">${note.text}</textarea>
                             </div>
                             ${editedIndicator}
                             ${note.tags.length > 0 ? `<div class="note-tags">${tagElements}</div>` : ''}
@@ -2579,8 +2531,6 @@
                     const time = new Date(msg.timestamp);
                     const timeString = time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                     
-                    // msg.text is already sanitized by the server (allows only img tags)
-                    // msg.user is already sanitized by the server (allows only color spans)
                     return `
                         <div class="chat-message">
                             <div class="chat-message-header">
@@ -2637,7 +2587,7 @@
                 
                 uniqueActs.forEach(act => {
                     const actElement = `
-                        <div class="filter-tag" data-act="${escapeHtml(act)}">${escapeHtml(act)}</div>
+                        <div class="filter-tag" data-act="${act}">${act}</div>
                     `;
                     actFilterContainer.innerHTML += actElement;
                 });

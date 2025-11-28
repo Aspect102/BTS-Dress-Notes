@@ -8,125 +8,6 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// HTML sanitization function to prevent XSS attacks (full escape)
-function escapeHtml(text) {
-    if (typeof text !== 'string') return text;
-    return text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-}
-
-// Sanitize name - allow only color spans
-function sanitizeName(text) {
-    if (typeof text !== 'string') return text;
-    
-    // Allow <span style="color: #hex or colorname">text</span> pattern only
-    const colorSpanRegex = /<span\s+style="color:\s*(#[0-9a-fA-F]{3,6}|[a-zA-Z]+)">([^<]*)<\/span>/gi;
-    const validSpans = [];
-    let match;
-    let tempText = text;
-    
-    // Find all valid color spans and store them with unique placeholders
-    while ((match = colorSpanRegex.exec(text)) !== null) {
-        const placeholder = `\x00COLORSPAN${validSpans.length}\x00`;
-        validSpans.push({
-            original: match[0],
-            color: match[1],
-            content: match[2],
-            placeholder: placeholder
-        });
-    }
-    
-    // Replace valid spans with placeholders (use a character that won't appear in normal text)
-    let result = text;
-    validSpans.forEach(span => {
-        result = result.replace(span.original, span.placeholder);
-    });
-    
-    // Escape ALL remaining HTML
-    result = escapeHtml(result);
-    
-    // Restore valid color spans (placeholders won't be affected by escapeHtml)
-    validSpans.forEach(span => {
-        result = result.replace(span.placeholder, `<span style="color: ${span.color}">${escapeHtml(span.content)}</span>`);
-    });
-    
-    return result;
-}
-
-// Sanitize shitpost - allow only img tags with safe src
-function sanitizeShitpost(text) {
-    if (typeof text !== 'string') return text;
-    // Allow <img src="url" alt="..." width="..." height="..."> pattern only
-    const imgRegex = /<img\s+src="(https?:\/\/[^"]+|data:image\/[^"]+)"(\s+alt="([^"]*)")?(\s+width="(\d+)")?(\s+height="(\d+)")?\s*\/?>/gi;
-    const validImgs = [];
-    let match;
-    
-    // Find all valid img tags and store them
-    while ((match = imgRegex.exec(text)) !== null) {
-        validImgs.push({
-            original: match[0],
-            src: match[1],
-            alt: match[3] || '',
-            width: match[5] || '',
-            height: match[7] || '',
-            placeholder: `\x00IMGTAG${validImgs.length}\x00`
-        });
-    }
-    
-    // Replace valid imgs with placeholders
-    let result = text;
-    validImgs.forEach(img => {
-        result = result.replace(img.original, img.placeholder);
-    });
-    
-    // Escape remaining HTML
-    result = escapeHtml(result);
-    
-    // Restore valid img tags
-    validImgs.forEach(img => {
-        let imgTag = `<img src="${img.src}"`;
-        if (img.alt) imgTag += ` alt="${escapeHtml(img.alt)}"`;
-        if (img.width) imgTag += ` width="${img.width}"`;
-        if (img.height) imgTag += ` height="${img.height}"`;
-        imgTag += ' style="max-width: 100%; max-height: 200px;">';
-        result = result.replace(img.placeholder, imgTag);
-    });
-    
-    return result;
-}
-
-// Sanitize note text - no HTML allowed, show message if attempted
-function sanitizeNote(text) {
-    if (typeof text !== 'string') return text;
-    // Check if text contains any HTML tags
-    if (/<[^>]+>/.test(text)) {
-        return 'Nice Try Zac...';
-    }
-    return escapeHtml(text);
-}
-
-// Sanitize user input object
-function sanitizeInput(input) {
-    if (typeof input === 'string') {
-        return escapeHtml(input);
-    }
-    if (Array.isArray(input)) {
-        return input.map(item => sanitizeInput(item));
-    }
-    if (input && typeof input === 'object') {
-        const sanitized = {};
-        for (const key in input) {
-            sanitized[key] = sanitizeInput(input[key]);
-        }
-        return sanitized;
-    }
-    return input;
-}
-
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -520,9 +401,9 @@ io.on('connection', (socket) => {
     // Handle tag creation/updates
     socket.on('create-tag', (tagData) => {
         const newTag = {
-            id: escapeHtml(tagData.id) || generateId(),
-            name: escapeHtml(tagData.name),
-            color: escapeHtml(tagData.color) || getRandomColor()
+            id: tagData.id || generateId(),
+            name: tagData.name,
+            color: tagData.color || getRandomColor()
         };
         
         const existingIndex = globalState.tags.findIndex(tag => tag.id === newTag.id);
@@ -604,12 +485,12 @@ io.on('connection', (socket) => {
             id: Date.now() + Math.random().toString(36).substr(2, 9),
             user: user.name,
             userId: user.id,
-            text: sanitizeNote(data.text),
+            text: data.text,
             timecode: noteTimecode,
-            lxCue: escapeHtml(data.lxCue) || globalState.currentLxCue,
+            lxCue: data.lxCue || globalState.currentLxCue,
             timestamp: new Date().toISOString(),
             frameRate: data.frameRate || globalState.timecode.frameRate,
-            tags: Array.isArray(data.tags) ? data.tags.map(tag => escapeHtml(tag)) : [],
+            tags: data.tags || [],
             act: globalState.currentAct, // Use current act from OSC
             comments: []
         };
@@ -632,7 +513,7 @@ io.on('connection', (socket) => {
                 id: Date.now() + Math.random().toString(36).substr(2, 9),
                 user: user.name,
                 userId: user.id,
-                text: sanitizeNote(text),
+                text: text,
                 timestamp: new Date().toISOString()
             };
             
@@ -653,7 +534,7 @@ io.on('connection', (socket) => {
             id: Date.now() + Math.random().toString(36).substr(2, 9),
             user: user.name,
             userId: user.id,
-            text: sanitizeShitpost(data.text),
+            text: data.text,
             timestamp: new Date().toISOString()
         };
         
@@ -681,7 +562,7 @@ io.on('connection', (socket) => {
         const note = globalState.notes.find(n => n.id === noteId);
         
         if (note) {
-            note.text = sanitizeNote(newText);
+            note.text = newText;
             // Update the timestamp to show when it was last edited
             note.lastEdited = new Date().toISOString();
             note.lastEditedBy = user.name;
@@ -700,7 +581,7 @@ io.on('connection', (socket) => {
         if (note && note.comments) {
             const comment = note.comments.find(c => c.id === commentId);
             if (comment) {
-                comment.text = sanitizeNote(newText);
+                comment.text = newText;
                 // Update the timestamp to show when it was last edited
                 comment.lastEdited = new Date().toISOString();
                 comment.lastEditedBy = user.name;
@@ -727,22 +608,18 @@ io.on('connection', (socket) => {
     socket.on('user-name-change', (newName) => {
         if (user.isOverlay) return;
         
-        // Sanitize the new name (allows color spans)
-        const sanitizedName = sanitizeName(newName);
-        
-        // Check if name is already taken by another user (compare plain text)
-        const plainName = newName.replace(/<[^>]*>/g, '').toLowerCase();
+        // Check if name is already taken by another user
         const isNameTaken = Array.from(globalState.users.values()).some(
-            u => u.id !== user.id && u.name.replace(/<[^>]*>/g, '').toLowerCase() === plainName && !u.isOverlay
+            u => u.id !== user.id && u.name.toLowerCase() === newName.toLowerCase() && !u.isOverlay
         );
         
         if (isNameTaken) {
             socket.emit('name-change-error', {
-                message: `Name "${escapeHtml(newName)}" is already taken. Please choose a different name.`
+                message: `Name "${newName}" is already taken. Please choose a different name.`
             });
         } else {
             const oldName = user.name;
-            user.name = sanitizedName;
+            user.name = newName;
             user.isAnonymous = false; // No longer anonymous
             
             // Remove from anonymous tracking
@@ -751,13 +628,13 @@ io.on('connection', (socket) => {
             // Update the user's name in all their notes and comments
             globalState.notes.forEach(note => {
                 if (note.userId === user.id) {
-                    note.user = sanitizedName;
+                    note.user = newName;
                 }
                 // Update user name in comments
                 if (note.comments) {
                     note.comments.forEach(comment => {
                         if (comment.userId === user.id) {
-                            comment.user = sanitizedName;
+                            comment.user = newName;
                         }
                     });
                 }
