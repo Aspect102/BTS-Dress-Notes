@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BTS Dress Notes - Act Overlay</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: transparent;
+            color: white;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .overlay-container {
+            display: flex;
+            flex-direction: row;
+            align-items: flex-end;
+            justify-content: center;
+            padding: 20px;
+            gap: 15px;
+            width: 100%;
+            height: 100vh;
+            background: transparent;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+        }
+        
+        .realtime-display {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(33, 150, 243, 0.5);
+            backdrop-filter: blur(5px);
+            min-width: 200px;
+            transition: all 0.3s ease;
+        }
+        
+        .act-display {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            padding: 15px 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+            border: 2px solid rgba(76, 175, 80, 0.5);
+            backdrop-filter: blur(5px);
+            min-width: 200px;
+        }
+        
+        .label {
+            font-size: 14px;
+            opacity: 0.8;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .realtime-value {
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #2196F3;
+            text-shadow: 0 0 10px rgba(33, 150, 243, 0.5);
+        }
+        
+        .act-value {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            color: #4CAF50;
+            text-shadow: 0 0 10px rgba(76, 175, 80, 0.5);
+        }
+        
+        .connection-status {
+            position: absolute;
+            bottom: 10px;
+            right: 10px;
+            font-size: 12px;
+            opacity: 0.7;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        
+        .connected {
+            color: #4CAF50;
+        }
+        
+        .disconnected {
+            color: #f44336;
+        }
+        
+        /* Size classes - matching original overlay */
+        .small .realtime-value,
+        .small .act-value {
+            font-size: 18px;
+        }
+        
+        .small .label {
+            font-size: 12px;
+        }
+        
+        .large .realtime-value,
+        .large .act-value {
+            font-size: 32px;
+        }
+        
+        .large .label {
+            font-size: 16px;
+        }
+        
+        /* Theme classes - matching original overlay */
+        .minimal .realtime-display,
+        .minimal .act-display {
+            background: rgba(0, 0, 0, 0.9);
+            border: none;
+            box-shadow: none;
+        }
+        
+        .dark .realtime-display,
+        .dark .act-display {
+            background: rgba(30, 30, 30, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .light .realtime-display,
+        .light .act-display {
+            background: rgba(255, 255, 255, 0.9);
+            color: #333;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+        
+        .light .realtime-value {
+            color: #0d47a1;
+            text-shadow: none;
+        }
+        
+        .light .act-value {
+            color: #2E7D32;
+            text-shadow: none;
+        }
+        
+        .light .label {
+            color: #333;
+        }
+        
+        /* Layout options - matching original overlay */
+        .layout-left {
+            justify-content: flex-start;
+        }
+        
+        .layout-center {
+            justify-content: center;
+        }
+        
+        .layout-right {
+            justify-content: flex-end;
+        }
+        
+        .layout-spaced {
+            justify-content: space-between;
+        }
+        
+        /* Hide individual elements if needed */
+        .realtime-hidden {
+            display: none !important;
+        }
+        
+        .act-hidden {
+            display: none !important;
+        }
+
+        /* Pulse animation for act changes */
+        @keyframes pulse-act {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+            100% { transform: scale(1); }
+        }
+
+        .act-pulse {
+            animation: pulse-act 0.5s ease-in-out;
+        }
+    </style>
+</head>
+<body>
+    <div class="overlay-container" id="overlayContainer">
+        <div class="realtime-display">
+            <div class="label">Real Time</div>
+            <div class="realtime-value" id="realtimeValue">00:00:00:00</div>
+        </div>
+        <div class="act-display">
+            <div class="label">Current Act</div>
+            <div class="act-value" id="actValue">Act 1</div>
+        </div>
+        <div class="connection-status disconnected" id="connectionStatus">Disconnected</div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const realtimeValue = document.getElementById('realtimeValue');
+            const actValue = document.getElementById('actValue');
+            const connectionStatus = document.getElementById('connectionStatus');
+            const overlayContainer = document.getElementById('overlayContainer');
+            
+            let currentAct = 'Act 1';
+            let realTimeInterval = null;
+            
+            // Parse URL parameters for customization - matching original overlay
+            const urlParams = new URLSearchParams(window.location.search);
+            
+            // Layout - same options as original overlay
+            const layout = urlParams.get('layout') || 'center';
+            overlayContainer.classList.add(`layout-${layout}`);
+            
+            // Size - same options as original overlay
+            const size = urlParams.get('size') || 'normal';
+            if (size !== 'normal') {
+                overlayContainer.classList.add(size);
+            }
+            
+            // Theme - same options as original overlay
+            const theme = urlParams.get('theme') || 'default';
+            if (theme !== 'default') {
+                overlayContainer.classList.add(theme);
+            }
+            
+            // Display mode - hide individual elements if needed
+            const display = urlParams.get('display');
+            if (display === 'realtime-only') {
+                document.querySelector('.act-display').classList.add('act-hidden');
+            } else if (display === 'act-only') {
+                document.querySelector('.realtime-display').classList.add('realtime-hidden');
+            }
+            
+            // Connect to WebSocket server
+            const socket = io();
+            
+            socket.on('connect', function() {
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.className = 'connection-status connected';
+            });
+            
+            socket.on('disconnect', function() {
+                connectionStatus.textContent = 'Disconnected';
+                connectionStatus.className = 'connection-status disconnected';
+                stopRealTimeMode();
+            });
+            
+            socket.on('act-update', function(act) {
+                if (act !== currentAct) {
+                    currentAct = act;
+                    actValue.textContent = act;
+                    
+                    // Add pulse animation for act changes
+                    actValue.classList.add('act-pulse');
+                    setTimeout(() => {
+                        actValue.classList.remove('act-pulse');
+                    }, 500);
+                }
+            });
+            
+            function startRealTimeMode() {
+                if (realTimeInterval) {
+                    clearInterval(realTimeInterval);
+                }
+                
+                updateRealTimeDisplay();
+                realTimeInterval = setInterval(updateRealTimeDisplay, 10);
+            }
+            
+            function stopRealTimeMode() {
+                if (realTimeInterval) {
+                    clearInterval(realTimeInterval);
+                    realTimeInterval = null;
+                }
+            }
+            
+            function updateRealTimeDisplay() {
+                const now = new Date();
+                const hours = now.getHours();
+                const minutes = now.getMinutes();
+                const seconds = now.getSeconds();
+                const milliseconds = now.getMilliseconds();
+                
+                const ms = Math.floor(milliseconds / 10);
+                const formattedTimecode = 
+                    `${hours.toString().padStart(2, '0')}:` +
+                    `${minutes.toString().padStart(2, '0')}:` +
+                    `${seconds.toString().padStart(2, '0')}:` +
+                    `${ms.toString().padStart(2, '0')}`;
+                
+                realtimeValue.textContent = formattedTimecode;
+            }
+            
+            // Initial display - exactly like original overlay
+            startRealTimeMode();
+            actValue.textContent = currentAct;
+        });
+    </script>
+</body>
+</html>
