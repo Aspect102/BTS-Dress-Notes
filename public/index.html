@@ -1870,21 +1870,22 @@
                 updateUserCount(data.userCount);
             });
             
-            window.socket.on('users-update', function(users) {
-                currentUsers = users;
-                updateUserCount(users.length);
-                
-                // Update users list in status panel
-                usersList.innerHTML = '';
-                users.forEach(user => {
-                    const userItem = document.createElement('li');
-                    userItem.className = 'user-item';
-                    userItem.innerHTML = `
-                        ${user.name}
-                        ${user.isTyping ? '<span class="user-typing"><span class="typing-indicator"></span>writing note</span>' : ''}
+            users.forEach(user => {
+                const userItem = document.createElement('li');
+                userItem.className = 'user-item';
+                const nameNode = document.createTextNode(user.name);
+                userItem.appendChild(nameNode);
+                if (user.isTyping) {
+                    const typingHTML = `
+                        <span class="user-typing">
+                            <span class="typing-indicator"></span>
+                            writing note
+                        </span>
                     `;
-                    usersList.appendChild(userItem);
-                });
+                    userItem.insertAdjacentHTML('beforeend', typingHTML);
+                }
+            
+                usersList.appendChild(userItem);
             });
             
             window.socket.on('name-change-error', function(data) {
