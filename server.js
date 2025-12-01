@@ -104,9 +104,9 @@ function sanitizeNote(text) {
     if (typeof text !== 'string') return text;
     // Check if text contains any HTML tags
     if (/<[^>]+>/.test(text)) {
-        return 'Nice Try Zac...';
+        return 'Post blocked: HTML tags are not allowed in notes/comments.';
     }
-    return escapeHtml(text);
+    return text.replace(/\u0000/g, '').trim();
 }
 
 // Sanitize user input object
